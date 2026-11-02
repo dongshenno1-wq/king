@@ -1,0 +1,5 @@
+# Release files are stored as ordinary Git blobs, not Git LFS.
+*.apk -filter -text -diff -merge
+*.pdf -filter -text -diff -merge
+*.mp4 -filter -text -diff -merge
+*.zip -filter -text -diff -merge
