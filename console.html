@@ -86,7 +86,7 @@ function render(){$('logout').style.display=ME?'':'none';$('who').textContent=ME
   $('go').onclick=login;$('pw').onkeydown=e=>{if(e.key==='Enter')login()};return}
  a.innerHTML=`<div class=card><div class=row><h2>${esc(ME.store.name)}</h2></div></div>
  <div class=card><div class=row><h2>${T('docs')}</h2><button class=s id=rf>⟳ ${T('refresh')}</button><button class=p id=ex>${T('exp')}</button><button class=s id=exa>${T('expAll')}</button><button class="s r" id=dl>${T('del')}</button></div>
- ${DOCS.length?`<table><tr><th><input type=checkbox id=all style="width:auto"></th><th>${T('name')}</th><th>${T('from')}</th><th>${T('time')}</th><th>${T('sheets')}</th><th>${T('qty')}</th><th>${T('status')}</th></tr>${DOCS.map(d=>`<tr><td><input type=checkbox data-d="${d.id}" ${sel.has(d.id)?'checked':''} style="width:auto"></td><td>${esc(d.title||d.payload.name)}</td><td>${esc(d.sender_name)}</td><td>${new Date(d.created_at).toLocaleString()}</td><td>${(d.payload.sheets||[]).length}</td><td>${qty(d.payload)}</td><td><span class="tag ${d.status}">${T(d.status)}</span></td></tr>`).join('')}</table>`:`<p>${T('none')}</p>`}</div>
+ ${DOCS.length?`<table><tr><th><input type=checkbox id=all style="width:auto"></th><th>${T('name')}</th><th>${T('from')}</th><th>${T('time')}</th><th>${T('sheets')}</th><th>${T('qty')}</th><th>${T('status')}</th><th>${T('xcol')}</th></tr>${DOCS.map(d=>`<tr><td><input type=checkbox data-d="${d.id}" ${sel.has(d.id)?'checked':''} style="width:auto"></td><td>${esc(d.title||d.payload.name)}</td><td>${esc(d.sender_name)}</td><td>${new Date(d.created_at).toLocaleString()}</td><td>${(d.payload.sheets||[]).length}</td><td>${qty(d.payload)}</td><td><span class="tag ${d.status}">${T(d.status)}</span></td><td>${xbadge(d)}</td></tr>`).join('')}</table>`:`<p>${T('none')}</p>`}</div>
  <div class=card><div class=row><h2>${T('staffs')}</h2><button class=p id=add>+ ${T('add')}</button></div><table><tr><th>${T('sname')}</th><th>${T('user')}</th><th>${T('status')}</th><th></th></tr>${STAFF.map(s=>`<tr class="${s.active?'':'off'}"><td>${esc(s.display_name)}</td><td>${esc(s.username)}</td><td>${T(s.active?'active':'inactive')}</td><td><button class=s data-a=toggle data-s="${s.id}">${T(s.active?'disable':'enable')}</button> <button class=s data-a=edit data-s="${s.id}">${T('edit')}</button> <button class=s data-a=pw data-s="${s.id}">${T('reset')}</button> <button class="s r" data-a=del data-s="${s.id}">${T('del')}</button></td></tr>`).join('')}</table></div>`;
  $('rf').onclick=async()=>{await loadAll();render()};$('ex').onclick=()=>exportX(false);$('exa').onclick=()=>exportX(true);$('dl').onclick=delDocs;$('add').onclick=addStaff;
  const all=$('all');if(all)all.onchange=()=>{sel=all.checked?new Set(DOCS.map(d=>d.id)):new Set();render()};
@@ -118,6 +118,16 @@ function exportX(one){if(!sel.size)return alert(T('pick'));const L=DOCS.filter(d
  for(const d of L){const p=d.payload||{},names=p.names||{};if(!one){wb=XLSX.utils.book_new();used.clear()}
   (p.sheets||[]).forEach((sh,i)=>XLSX.utils.book_append_sheet(wb,sheetRows(sh,names),add(wb,one?((d.sender_name||'')+'-'+(p.name||'')+'-'+(sh.name||i+1)):(sh.name||'Sheet'+(i+1)))));
   if(!one)XLSX.writeFile(wb,fn((p.name||d.title)+'_'+(d.sender_name||'')+'_'+d.created_at.slice(0,10))+'.xlsx')}
- if(one)XLSX.writeFile(wb,'盘点汇总_'+new Date().toISOString().slice(0,10)+'.xlsx')}
+ if(one)XLSX.writeFile(wb,'盘点汇总_'+new Date().toISOString().slice(0,10)+'.xlsx');xcBump(L.map(d=>d.id))}
 applyLang();boot().catch(e=>{err=emsg(e);render()});
-</script></body></html>
+</script><script>
+// v2.4: export badge. Count lives in documents.payload.xc (shared with the owner app); no schema change.
+Object.assign(I.zh,{xcol:'导出',xNone:'未导出',xDone:'已导出 {0} 次'});Object.assign(I.en,{xcol:'Exported',xNone:'Not exported',xDone:'Exported {0}×'});
+Object.assign(I.th,{xcol:'ส่งออก',xNone:'ยังไม่ส่งออก',xDone:'ส่งออกแล้ว {0} ครั้ง'});Object.assign(I.ms,{xcol:'Eksport',xNone:'Belum dieksport',xDone:'Dieksport {0} kali'});
+Object.assign(I.my,{xcol:'ထုတ်ယူ',xNone:'မထုတ်ရသေး',xDone:'{0} ကြိမ် ထုတ်ပြီး'});
+function xbadge(d){const n=+((d.payload||{}).xc)||0;return `<span class="xb ${n?'on':''}" data-xc="${n}">${n?T('xDone',n):T('xNone')}</span>`}
+async function xcBump(ids){for(const id of ids){try{const {data:r,error}=await sb.from('documents').select('id,payload').eq('id',id).maybeSingle();if(error||!r)continue;
+  const v=(+(r.payload&&r.payload.xc)||0)+1;const u=await sb.from('documents').update({payload:{...r.payload,xc:v}}).eq('id',id);if(!u.error){const d=DOCS.find(x=>x.id===id);if(d)d.payload={...r.payload,xc:v}}}catch(e){}}render()}
+{const st=document.createElement('style');st.textContent='.xb{border-radius:999px;padding:2px 10px;font-size:12px;background:#eceff1;color:#78909c;white-space:nowrap}.xb.on{background:#e8f5e9;color:#2e7d32;font-weight:600}';document.head.appendChild(st)}
+</script>
+</body></html>
